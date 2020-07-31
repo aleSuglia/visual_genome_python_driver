@@ -1,11 +1,11 @@
 import gc
 import json
 import os
+
 import pandas as pd
+import visual_genome.utils as utils
 from nltk.corpus import wordnet as wn
 from tqdm import tqdm
-
-import visual_genome.utils as utils
 from visual_genome.models import (Image, Object, Attribute, Relationship,
                                   Graph, Synset)
 
@@ -269,7 +269,19 @@ def init_synsets(scene_graph, synset_file):
         s['synset_name'], s['synset_definition']) for s in syn_data}
 
     for obj in scene_graph.objects:
-        obj.synsets = [syn_class[sn] if sn in syn_class else Synset(sn, wn.synset(sn)) for sn in obj.synsets]
+        new_obj_synsets = []
+
+        for sn in obj.synsets:
+            if isinstance(sn, Synset):
+                new_obj_synsets.append(sn)
+            elif isinstance(sn, str):
+                if sn in syn_class:
+                    new_obj_synsets.append(syn_class[sn])
+                else:
+                    new_obj_synsets.append(Synset(sn, wn.synset(sn)))
+
+        obj.synsets = new_obj_synsets
+
     for rel in scene_graph.relationships:
         rel.synset = [syn_class[sn] for sn in rel.synset]
     for attr in scene_graph.attributes:
@@ -449,7 +461,7 @@ def save_scene_graphs_by_id(data_dir='data/', image_data_dir='data/by-id/'):
         os.mkdir(image_data_dir)
 
     attributes_data = pd.read_json(data_dir + "visa.jsonl", orient="records", lines=True)
-    with open(data_dir + "gw_vg_metadata.json") as in_file:
+    with open(data_dir + "gw_vg_mapping.json") as in_file:
         gw_vg_metadata = json.load(in_file)
 
     vg_image_data = get_all_image_data(data_dir, True)
